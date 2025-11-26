@@ -1,0 +1,15 @@
+D:\Downloads\DistributedRoomBooking\BookingServer\bin\Debug\net8.0-windows\BookingServer.exe
+D:\Downloads\DistributedRoomBooking\BookingServer\bin\Debug\net8.0-windows\BookingServer.deps.json
+D:\Downloads\DistributedRoomBooking\BookingServer\bin\Debug\net8.0-windows\BookingServer.runtimeconfig.json
+D:\Downloads\DistributedRoomBooking\BookingServer\bin\Debug\net8.0-windows\BookingServer.dll
+D:\Downloads\DistributedRoomBooking\BookingServer\bin\Debug\net8.0-windows\BookingServer.pdb
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.GeneratedMSBuildEditorConfig.editorconfig
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.AssemblyInfoInputs.cache
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.AssemblyInfo.cs
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.csproj.CoreCompileInputs.cache
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.sourcelink.json
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.dll
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\refint\BookingServer.dll
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.pdb
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.genruntimeconfig.cache
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\ref\BookingServer.dll
