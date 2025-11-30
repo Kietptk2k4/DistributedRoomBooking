@@ -3,13 +3,6 @@ using System;
 
 namespace BookingServer
 {
-    /// <summary>
-    /// Thông tin phòng học ở mức "thực tế" hơn:
-    /// - RoomId: mã phòng (A08...)
-    /// - Building: cơ sở / tòa nhà
-    /// - Capacity: sức chứa
-    /// - Các thuộc tính tiện nghi
-    /// </summary>
     public class RoomInfo
     {
         public string RoomId { get; set; } = "";      // A08
@@ -22,11 +15,9 @@ namespace BookingServer
         public string Status { get; set; } = "ACTIVE"; // ACTIVE / UNDER_MAINTENANCE / DISABLED
     }
 
-    /// <summary>
     /// Thông tin người dùng: sinh viên / giảng viên / staff.
     /// Hiện tại vẫn dùng UserId thay cho ClientId, nhưng sau này
     /// có thể map 1-1 (client C1 = sv001, C2 = gv001, ...).
-    /// </summary>
     public class UserInfo
     {
         public string UserId { get; set; } = "";      // dùng thay cho ClientId thuần
@@ -45,14 +36,9 @@ namespace BookingServer
         // Thông tin liên hệ chung
         public string Email { get; set; } = "";
         public string Phone { get; set; } = "";
+        public string PasswordHash { get; set; } = "";
+        public bool IsActive { get; set; } = true;
     }
-
-    /// <summary>
-    /// Thông tin 1 booking "thực tế":
-    /// - Ai đặt, phòng nào, ngày nào, ca nào
-    /// - Trạng thái: REQUESTED / APPROVED / REJECTED / CANCELLED / COMPLETED / NO_SHOW
-    /// Hiện tại milestone 1 mới chỉ chuẩn bị model, chưa gắn vào logic.
-    /// </summary>
     public class Booking
     {
         public Guid BookingId { get; set; }

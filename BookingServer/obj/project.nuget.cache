@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "P7vFyyzAp64=",
+  "dgSpecHash": "I85zFoFusxI=",
   "success": true,
   "projectFilePath": "D:\\Downloads\\DistributedRoomBooking\\BookingServer\\BookingServer.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\Admin\\.nuget\\packages\\bcrypt.net-next\\4.0.3\\bcrypt.net-next.4.0.3.nupkg.sha512"
+  ],
   "logs": []
 }

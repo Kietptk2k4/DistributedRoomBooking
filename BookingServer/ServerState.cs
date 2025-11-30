@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using BC = BCrypt.Net.BCrypt;
 
 namespace BookingServer;
 
@@ -118,7 +119,9 @@ class ServerState
                 Class = "D21CQCN01-N",
                 Department = "CNTT",
                 Email = "sv001@example.com",
-                Phone = "0900000001"
+                Phone = "0900000001",
+                PasswordHash = BC.HashPassword("sv123"),
+                IsActive = true
             };
 
             _users["sv002"] = new UserInfo
@@ -130,7 +133,9 @@ class ServerState
                 Class = "D21CQCN02-N",
                 Department = "CNTT",
                 Email = "sv002@example.com",
-                Phone = "0900000002"
+                Phone = "0900000002",
+                PasswordHash = BC.HashPassword("sv123"),
+                IsActive = true
             };
 
             _users["gv001"] = new UserInfo
@@ -141,7 +146,9 @@ class ServerState
                 LecturerId = "GV001",
                 Faculty = "Khoa CNTT",
                 Email = "gv001@example.com",
-                Phone = "0900000003"
+                Phone = "0900000003",
+                PasswordHash = BC.HashPassword("gv123"),
+                IsActive = true
             };
 
             _users["admin"] = new UserInfo
@@ -151,7 +158,9 @@ class ServerState
                 FullName = "Phòng Đào Tạo",
                 Department = "Phòng Đào Tạo",
                 Email = "admin@example.com",
-                Phone = "0900000004"
+                Phone = "0900000004",
+                PasswordHash = BC.HashPassword("admin123"),
+                IsActive = true
             };
         }
 

@@ -13,3 +13,6 @@ D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\refin
 D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.pdb
 D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.genruntimeconfig.cache
 D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\ref\BookingServer.dll
+D:\Downloads\DistributedRoomBooking\BookingServer\bin\Debug\net8.0-windows\BCrypt.Net-Next.dll
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingServer.csproj.AssemblyReference.cache
+D:\Downloads\DistributedRoomBooking\BookingServer\obj\Debug\net8.0-windows\BookingS.BAC8B489.Up2Date
