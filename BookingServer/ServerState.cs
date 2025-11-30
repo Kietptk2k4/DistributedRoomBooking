@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using BC = BCrypt.Net.BCrypt;
+using BCryptNet = BCrypt.Net.BCrypt;
 
 namespace BookingServer;
 
@@ -53,7 +54,7 @@ class ServerState
     private readonly object _lock = new();
 
     private string _currentDateKey = DateTime.Today.ToString("yyyy-MM-dd");
-      // ===== DATA MÔ HÌNH THỰC TẾ (ROOMS / USERS / BOOKINGS) =====
+    // ===== DATA MÔ HÌNH THỰC TẾ (ROOMS / USERS / BOOKINGS) =====
 
     // Thông tin phòng (RoomInfo) key theo RoomId (A08, A16,...)
     private readonly Dictionary<string, RoomInfo> _rooms = new();
@@ -236,6 +237,27 @@ class ServerState
         return result;
     }
 
+    public (bool Success, string? UserType, string Error) ValidateUserCredentials(string userId, string password)
+    {
+        if (!_users.TryGetValue(userId, out var user))
+            return (false, null, "User not found");
+
+        if (!user.IsActive)
+            return (false, null, "User inactive");
+
+        // kiểm tra BCrypt
+        if (!BCryptNet.Verify(password, user.PasswordHash))
+            return (false, null, "Invalid password");
+
+        return (true, user.UserType, "");
+    }
+
+    public bool IsAdmin(string userId)
+    {
+        if (!_users.TryGetValue(userId, out var user)) return false;
+        return user.UserType == "Staff" || user.UserType == "Admin";
+    }
+
     // Lấy queue cụ thể cho 1 (room, slot) của ngày hiện tại -> hiển thị chi tiết hàng đợi
     public List<string> GetQueueClients(string roomId, string slotId)
     {
@@ -250,6 +272,29 @@ class ServerState
 
             return slot.WaitingQueue.Select(q => q.clientId).ToList();
         }
+    }
+
+    public bool CreateUser(UserInfo newUser, string passwordPlain, out string error)
+    {
+        error = "";
+
+        if (string.IsNullOrWhiteSpace(newUser.UserId))
+        {
+            error = "UserId is required";
+            return false;
+        }
+
+        if (_users.ContainsKey(newUser.UserId))
+        {
+            error = $"UserId {newUser.UserId} already exists";
+            return false;
+        }
+
+        newUser.PasswordHash = BCryptNet.HashPassword(passwordPlain);
+        newUser.IsActive = true;
+
+        _users[newUser.UserId] = newUser;
+        return true;
     }
 
     // Chuyển "S3" -> index 3
@@ -421,17 +466,32 @@ class ServerState
                 return;
             }
 
-            // Trường hợp client đang là holder -> RELEASE hợp lệ
-            if (slot.CurrentHolderClientId == clientId)
-            {
-                log.WriteLine($"[RELEASE] {clientId} -> {roomId}-{slotId} on {_currentDateKey}");
+            bool isAdmin = IsAdmin(clientId);
 
-                // Thông báo cho client là đã RELEASE xong
+            // ===== 1. CASE: HOLDER hoặc ADMIN FORCE RELEASE =====
+            // - Nếu client đang là holder -> release bình thường
+            // - Nếu client là admin và có ai đó đang giữ -> force release
+            if (slot.CurrentHolderClientId == clientId || (isAdmin && slot.CurrentHolderClientId != null))
+            {
+                var previousHolder = slot.CurrentHolderClientId;
+
+                if (slot.CurrentHolderClientId == clientId)
+                {
+                    log.WriteLine($"[RELEASE] {clientId} -> {roomId}-{slotId} on {_currentDateKey}");
+                }
+                else
+                {
+                    // Admin force release
+                    log.WriteLine($"[ADMIN RELEASE] {clientId} force release {roomId}-{slotId} on {_currentDateKey} (was held by {previousHolder})");
+                }
+
+                // Thông báo cho người gọi (admin hoặc holder) là đã release xong
                 if (replyStream != null)
                 {
                     Send(replyStream, $"INFO|RELEASED|{roomId}|{slotId}\n");
                 }
 
+                // Nếu không có ai trong queue -> FREE
                 if (slot.WaitingQueue.Count == 0)
                 {
                     slot.IsBusy = false;
@@ -440,17 +500,28 @@ class ServerState
                 }
                 else
                 {
+                    // Có queue -> cấp cho client đầu tiên trong hàng đợi
                     var (nextClientId, nextStream) = slot.WaitingQueue.Dequeue();
                     slot.IsBusy = true;
                     slot.CurrentHolderClientId = nextClientId;
-                    log.WriteLine($"[GRANT] {nextClientId} (from queue) -> {roomId}-{slotId} on {_currentDateKey}");
+
+                    if (isAdmin && previousHolder != clientId)
+                    {
+                        // Trường hợp admin force release + có queue
+                        log.WriteLine($"[GRANT] {nextClientId} (from queue, admin force) -> {roomId}-{slotId} on {_currentDateKey}");
+                    }
+                    else
+                    {
+                        log.WriteLine($"[GRANT] {nextClientId} (from queue) -> {roomId}-{slotId} on {_currentDateKey}");
+                    }
+
                     Send(nextStream, $"GRANT|{roomId}|{slotId}\n");
                 }
 
                 return;
             }
 
-            // Không phải holder -> thử xóa client khỏi queue (client đang chờ nhưng bấm Hủy)
+            // ===== 2. CASE: client không giữ slot, thử hủy khi đang trong queue =====
             int removed = RemoveFromQueue(slot, clientId);
             if (removed > 0)
             {
@@ -459,15 +530,15 @@ class ServerState
                 {
                     Send(replyStream, $"INFO|CANCELLED|{roomId}|{slotId}\n");
                 }
+                return;
             }
-            else
+
+            // ===== 3. CASE: không phải holder, không trong queue =====
+            // - Nếu là admin nhưng không có ai giữ slot và không có trong queue -> cũng coi như lỗi nghiệp vụ.
+            log.WriteLine($"[WARN] RELEASE from non-holder/non-queued {clientId} on {roomId}-{slotId} on {_currentDateKey}");
+            if (replyStream != null)
             {
-                // Không giữ quyền, không nằm trong queue -> từ chối
-                log.WriteLine($"[WARN] RELEASE from non-holder/non-queued {clientId} on {roomId}-{slotId} on {_currentDateKey}");
-                if (replyStream != null)
-                {
-                    Send(replyStream, "INFO|ERROR|Not holder or queued\n");
-                }
+                Send(replyStream, "INFO|ERROR|Not holder or queued\n");
             }
         }
     }

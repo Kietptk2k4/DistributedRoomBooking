@@ -102,11 +102,79 @@ public partial class Form1 : Form
             Multiline = true,
             ScrollBars = ScrollBars.Vertical,
             Left = 420,
-            Top = 240,
+            Top = 360,
             Width = 450,
             Height = 290
         };
         this.Controls.Add(_txtLog);
+
+        //Thêm UI quản lý user (tab User Management)
+        var grpUser = new GroupBox
+        {
+            Text = "User Management (Admin on Server)",
+            Left = 420,
+            Top = 240,
+            Width = 450,
+            Height = 150
+        };
+        this.Controls.Add(grpUser);
+
+        var lblUid = new Label { Left = 10, Top = 25, Width = 60, Text = "UserId:" };
+        var txtUid = new TextBox { Left = 80, Top = 22, Width = 100 };
+
+        var lblName = new Label { Left = 190, Top = 25, Width = 60, Text = "Name:" };
+        var txtName = new TextBox { Left = 250, Top = 22, Width = 180 };
+
+        var lblType = new Label { Left = 10, Top = 55, Width = 60, Text = "Type:" };
+        var cbType = new ComboBox
+        {
+            Left = 80,
+            Top = 52,
+            Width = 100,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+        cbType.Items.AddRange(new object[] { "Student", "Lecturer", "Staff" });
+        cbType.SelectedIndex = 0;
+
+        var lblPwd = new Label { Left = 190, Top = 55, Width = 60, Text = "Password:" };
+        var txtPwd = new TextBox { Left = 250, Top = 52, Width = 180 };
+
+        var btnCreateUser = new Button
+        {
+            Left = 80,
+            Top = 85,
+            Width = 120,
+            Text = "Create / Add User"
+        };
+        btnCreateUser.Click += (s, e) =>
+        {
+            var user = new UserInfo
+            {
+                UserId = txtUid.Text.Trim(),
+                FullName = txtName.Text.Trim(),
+                UserType = cbType.SelectedItem?.ToString() ?? "Student"
+            };
+
+            var ok = _state.CreateUser(user, txtPwd.Text.Trim(), out var err);
+            if (!ok)
+            {
+                Log("[USER MGMT] " + err);
+                MessageBox.Show(err, "User Management", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            else
+            {
+                Log($"[USER MGMT] User {user.UserId} created ({user.UserType})");
+                MessageBox.Show("User created", "User Management");
+            }
+        };
+
+        grpUser.Controls.AddRange(new Control[]
+        {
+    lblUid, txtUid, lblName, txtName,
+    lblType, cbType, lblPwd, txtPwd, btnCreateUser
+        });
+
+
     }
 
     private void DtDate_ValueChanged(object? sender, EventArgs e)
@@ -143,6 +211,7 @@ public partial class Form1 : Form
         {
             string? line;
             string? clientId = null;
+            string? currentUserType = null;
 
             try
             {
@@ -158,14 +227,52 @@ public partial class Form1 : Form
 
                     switch (cmd)
                     {
+                        case "LOGIN":
+                            if (parts.Length != 3)
+                            {
+                                await SendAsync(stream, "INFO|LOGIN_FAIL|Invalid format\n");
+                                break;
+                            }
+                            {
+                                var userId = parts[1];
+                                var password = parts[2];
+
+                                var (success, userType, error) = _state.ValidateUserCredentials(userId, password);
+                                if (!success || userType == null)
+                                {
+                                    await SendAsync(stream, $"INFO|LOGIN_FAIL|{error}\n");
+                                    Log($"[LOGIN FAIL] {userId} - {error}");
+                                }
+                                else
+                                {
+                                    clientId = userId;
+                                    currentUserType = userType;
+                                    await SendAsync(stream, $"INFO|LOGIN_OK|{userType}\n");
+                                    Log($"[LOGIN OK] {userId} ({userType})");
+                                }
+                            }
+                            break;
+
                         case "REQUEST":
                             if (parts.Length != 4)
                             {
                                 await SendAsync(stream, "INFO|ERROR|Invalid REQUEST format\n");
                                 break;
                             }
-                            clientId ??= parts[1];
-                            _state.HandleRequest(parts[1], parts[2], parts[3], stream, new UiLogger(this));
+
+                            if (clientId == null)
+                            {
+                                await SendAsync(stream, "INFO|ERROR|NOT_AUTHENTICATED\n");
+                                break;
+                            }
+
+                            if (!string.Equals(clientId, parts[1], StringComparison.OrdinalIgnoreCase))
+                            {
+                                await SendAsync(stream, "INFO|ERROR|USER_MISMATCH\n");
+                                break;
+                            }
+
+                            _state.HandleRequest(clientId, parts[2], parts[3], stream, new UiLogger(this));
                             RefreshSlotsSafe();
                             break;
 
@@ -175,8 +282,20 @@ public partial class Form1 : Form
                                 await SendAsync(stream, "INFO|ERROR|Invalid RELEASE format\n");
                                 break;
                             }
-                            clientId ??= parts[1];
-                            _state.HandleRelease(parts[1], parts[2], parts[3], stream, new UiLogger(this));
+
+                            if (clientId == null)
+                            {
+                                await SendAsync(stream, "INFO|ERROR|NOT_AUTHENTICATED\n");
+                                break;
+                            }
+
+                            if (!string.Equals(clientId, parts[1], StringComparison.OrdinalIgnoreCase))
+                            {
+                                await SendAsync(stream, "INFO|ERROR|USER_MISMATCH\n");
+                                break;
+                            }
+
+                            _state.HandleRelease(clientId, parts[2], parts[3], stream, new UiLogger(this));
                             RefreshSlotsSafe();
                             break;
 

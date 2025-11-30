@@ -11,6 +11,8 @@ namespace BookingClient
     {
         private TextBox _txtClientId = null!;
         private TextBox _txtServerIp = null!;
+        private TextBox _txtUserId = null!;
+        private TextBox _txtPassword = null!;
         private ComboBox _cbRoom = null!;
         private ComboBox _cbSlot = null!;
         private Button _btnConnect = null!;
@@ -22,7 +24,8 @@ namespace BookingClient
         private TcpClient? _client;
         private NetworkStream? _stream;
         private bool _connected = false;
-
+        private string? _currentUserId;
+        private string? _currentUserType;
         public Form1()
         {
             InitializeComponent();
@@ -36,19 +39,28 @@ namespace BookingClient
             this.Height = 430;
             this.StartPosition = FormStartPosition.CenterScreen;
 
-            Label lblId = new Label { Text = "Client ID:", Left = 10, Top = 10, Width = 70 };
+            Label lblId = new Label { Text = "User ID:", Left = 10, Top = 10, Width = 70 };
             this.Controls.Add(lblId);
-            _txtClientId = new TextBox { Left = 90, Top = 8, Width = 100, Text = "C1" };
-            this.Controls.Add(_txtClientId);
+            _txtUserId = new TextBox { Left = 80, Top = 8, Width = 100, Text = "sv001" };
+            this.Controls.Add(_txtUserId);
 
-            Label lblIp = new Label { Text = "Server IP:", Left = 210, Top = 10, Width = 70 };
+            Label lblPwd = new Label { Text = "Password:", Left = 190, Top = 10, Width = 70 };
+            this.Controls.Add(lblPwd);
+            _txtPassword = new TextBox { Left = 260, Top = 8, Width = 100, UseSystemPasswordChar = true, Text = "123456" };
+            this.Controls.Add(_txtPassword);
+
+            Label lblIp = new Label { Text = "Server IP:", Left = 370, Top = 10, Width = 70 };
             this.Controls.Add(lblIp);
-            _txtServerIp = new TextBox { Left = 290, Top = 8, Width = 110, Text = "127.0.0.1" };
+            _txtServerIp = new TextBox { Left = 440, Top = 8, Width = 110, Text = "127.0.0.1" };
             this.Controls.Add(_txtServerIp);
 
             _btnConnect = new Button { Text = "Connect", Left = 410, Top = 6, Width = 80 };
             _btnConnect.Click += BtnConnect_Click;
             this.Controls.Add(_btnConnect);
+
+            var btnLogin = new Button { Text = "Login", Left = 100, Top = 38, Width = 80 };
+            btnLogin.Click += BtnLogin_Click;
+            this.Controls.Add(btnLogin);
 
             Label lblRoom = new Label { Text = "Room:", Left = 10, Top = 40, Width = 50 };
             this.Controls.Add(lblRoom);
@@ -73,11 +85,11 @@ namespace BookingClient
             _cbSlot.SelectedIndex = 0;
             this.Controls.Add(_cbSlot);
 
-            _btnRequest = new Button { Text = "REQUEST", Left = 320, Top = 36, Width = 90 };
+            _btnRequest = new Button { Text = "REQUEST", Left = 320, Top = 36, Width = 90, Enabled = false };
             _btnRequest.Click += BtnRequest_Click;
             this.Controls.Add(_btnRequest);
 
-            _btnRelease = new Button { Text = "RELEASE", Left = 420, Top = 36, Width = 90 };
+            _btnRelease = new Button { Text = "RELEASE", Left = 420, Top = 36, Width = 90, Enabled = false };
             _btnRelease.Click += BtnRelease_Click;
             this.Controls.Add(_btnRelease);
 
@@ -125,6 +137,32 @@ namespace BookingClient
                 Log("[ERROR] " + ex.Message);
                 SetStatus("ERROR", ex.Message, System.Drawing.Color.LightCoral);
             }
+        }
+
+        private async void BtnLogin_Click(object? sender, EventArgs e)
+        {
+            if (!_connected || _stream == null)
+            {
+                SetStatus("ERROR", "Not connected to server", System.Drawing.Color.LightCoral);
+                return;
+            }
+
+            var userId = _txtUserId.Text.Trim();
+            var password = _txtPassword.Text;
+
+            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrEmpty(password))
+            {
+                SetStatus("ERROR", "UserId / Password không được để trống", System.Drawing.Color.LightCoral);
+                return;
+            }
+
+            var msg = $"LOGIN|{userId}|{password}\n";
+            var data = Encoding.UTF8.GetBytes(msg);
+            await _stream.WriteAsync(data, 0, data.Length);
+            Log("[CLIENT] Sent " + msg.Trim());
+            SetStatus("LOGINING", "Đang gửi yêu cầu đăng nhập...", System.Drawing.Color.LightYellow);
+
+            // chờ server trả INFO|LOGIN_OK hoặc LOGIN_FAIL trong ReadLoopAsync
         }
 
         private async Task ReadLoopAsync()
@@ -213,8 +251,31 @@ namespace BookingClient
                     if (parts.Length >= 2)
                     {
                         var infoType = parts[1];
+                        if (infoType == "LOGIN_OK" && parts.Length >= 3)
+                        {
+                            var userType = parts[2];
+                            _currentUserId = _txtUserId.Text.Trim();
+                            _currentUserType = userType;
 
-                        if (infoType == "ERROR")
+                            this.Text = $"Client - Logged in as {_currentUserId} ({userType})";
+                            SetStatus("LOGIN_OK", $"Logged in as {_currentUserId} ({userType})", System.Drawing.Color.LightGreen);
+
+                            _btnRequest.Enabled = true;
+                            _btnRelease.Enabled = true;
+                        }
+                        else if (infoType == "LOGIN_FAIL" && parts.Length >= 3)
+                        {
+                            var reason = parts[2];
+                            _currentUserId = null;
+                            _currentUserType = null;
+
+                            this.Text = "Client - Login failed";
+                            SetStatus("LOGIN_FAIL", reason, System.Drawing.Color.LightCoral);
+
+                            _btnRequest.Enabled = false;
+                            _btnRelease.Enabled = false;
+                        }
+                        else if (infoType == "ERROR")
                         {
                             // INFO|ERROR|message...
                             string msgErr = parts.Length >= 3 ? parts[2] : "Unknown error";
@@ -241,7 +302,7 @@ namespace BookingClient
                         else if (infoType == "CANCELLED" && parts.Length >= 4)
                         {
                             // INFO|CANCELLED|room|slot
-                            this.Text = "Client - IDLE (cancelled)";  
+                            this.Text = "Client - IDLE (cancelled)";
                             SetStatus("IDLE", "Request cancelled", System.Drawing.Color.LightGray);
                         }
                         else if (infoType == "RELEASEED" && parts.Length >= 4)
@@ -270,7 +331,13 @@ namespace BookingClient
                 return;
             }
 
-            var clientId = _txtClientId.Text.Trim();
+            if (string.IsNullOrEmpty(_currentUserId))
+            {
+                SetStatus("ERROR", "Bạn cần đăng nhập trước khi REQUEST", System.Drawing.Color.LightCoral);
+                return;
+            }
+
+            var clientId = _currentUserId;  // user đã login
             var room = _cbRoom.SelectedItem?.ToString() ?? "A08";
             var slotNumber = _cbSlot.SelectedItem?.ToString() ?? "1";
             var slotId = "S" + slotNumber;
@@ -291,7 +358,13 @@ namespace BookingClient
                 return;
             }
 
-            var clientId = _txtClientId.Text.Trim();
+            if (string.IsNullOrEmpty(_currentUserId))
+            {
+                SetStatus("ERROR", "Bạn cần đăng nhập trước khi RELEASE", System.Drawing.Color.LightCoral);
+                return;
+            }
+
+            var clientId = _currentUserId;  // user đã login
             var room = _cbRoom.SelectedItem?.ToString() ?? "A08";
             var slotNumber = _cbSlot.SelectedItem?.ToString() ?? "1";
             var slotId = "S" + slotNumber;
@@ -300,7 +373,6 @@ namespace BookingClient
             var data = Encoding.UTF8.GetBytes(msg);
             await _stream.WriteAsync(data, 0, data.Length);
             Log("[CLIENT] Sent " + msg.Trim());
-            // Status sẽ được cập nhật khi nhận INFO|RELEASED hoặc CANCELLED từ server
         }
 
         private void Log(string text)
